@@ -16,6 +16,11 @@ public class AuthController {
         this.userService = userService;
     }
 
+    @GetMapping("/landing")
+    public String landing() {
+        return "landing";
+    }
+
     @GetMapping("/auth/login")
     public String login() {
         return "login";
