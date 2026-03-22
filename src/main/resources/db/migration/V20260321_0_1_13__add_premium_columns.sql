@@ -1,0 +1,3 @@
+ALTER TABLE users ADD COLUMN premium BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(255);
+ALTER TABLE users ADD COLUMN premium_until DATE;
