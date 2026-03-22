@@ -251,6 +251,11 @@ public class DocumentController {
         return "document-edit";
     }
 
+    @GetMapping("/cabinet/documents/{id}")
+    public String viewDocumentById(@PathVariable Long id, Authentication authentication, Model model, HttpServletResponse response) {
+        return viewDocument(id, authentication, model, response);
+    }
+
     @PostMapping("/cabinet/documents/{id}/edit")
     public String updateDocument(
             @PathVariable Long id,

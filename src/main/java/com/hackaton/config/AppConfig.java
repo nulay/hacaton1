@@ -81,12 +81,44 @@ public class AppConfig implements WebMvcConfigurer {
 
     @Bean
     public DataSource dataSource() {
-        String dbUrl = environment.getProperty("db.url", "jdbc:postgresql://localhost:5432/medical_archive");
+        String dbUrl;
         String dbUser = environment.getProperty("db.user", "postgres");
         String dbPassword = environment.getProperty("db.password", "postgres");
 
+        String databaseUrl = environment.getProperty("DB_URL");
+        if (databaseUrl != null && !databaseUrl.isEmpty()) {
+            java.net.URI uri;
+            try {
+                uri = new java.net.URI(databaseUrl);
+            } catch (Exception e) {
+                log.error("Failed to parse DATABASE_URL: {}", databaseUrl);
+                throw new RuntimeException("Invalid DATABASE_URL format", e);
+            }
+            
+            dbUser = uri.getUserInfo() != null ? uri.getUserInfo().split(":")[0] : dbUser;
+            dbPassword = uri.getUserInfo() != null && uri.getUserInfo().split(":").length > 1 
+                ? uri.getUserInfo().split(":")[1] : dbPassword;
+            
+            String host = uri.getHost();
+            int port = uri.getPort() > 0 ? uri.getPort() : 5432;
+            String dbName = uri.getPath() != null ? uri.getPath().substring(1) : "medical_archive";
+            
+            StringBuilder jdbcUrl = new StringBuilder("jdbc:postgresql://");
+            jdbcUrl.append(host).append(":").append(port).append("/").append(dbName);
+            jdbcUrl.append("?characterEncoding=utf8&useUnicode=true");
+            if (uri.getQuery() != null) {
+                jdbcUrl.append("&").append(uri.getQuery());
+            }
+            
+            dbUrl = jdbcUrl.toString();
+            log.info("Using DATABASE_URL: host={}, port={}, db={}", host, port, dbName);
+        } else {
+            dbUrl = environment.getProperty("db.url", "jdbc:postgresql://localhost:5432/medical_archive");
+            log.info("Using default db properties. url={}", dbUrl);
+        }
+
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(dbUrl + "?characterEncoding=utf8&useUnicode=true");
+        config.setJdbcUrl(dbUrl);
         config.setUsername(dbUser);
         config.setPassword(dbPassword);
         config.setDriverClassName("org.postgresql.Driver");
@@ -94,7 +126,7 @@ public class AppConfig implements WebMvcConfigurer {
         config.addDataSourceProperty("prepStmtCacheSize", "250");
         config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
 
-        log.info("HikariCP DataSource configured. url={}, user={}", dbUrl, dbUser);
+        log.info("HikariCP DataSource configured for user: {}", dbUser);
         return new HikariDataSource(config);
     }
 

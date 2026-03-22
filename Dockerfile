@@ -6,5 +6,5 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 FROM tomcat:9.0.102-jre21
-COPY --from=builder /app/target/medical-archive.war /usr/local/tomcat/webapps/
+COPY --from=builder /app/target/medical-archive.war /usr/local/tomcat/webapps/ROOT.war
 EXPOSE 8080
