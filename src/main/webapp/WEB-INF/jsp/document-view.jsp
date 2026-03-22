@@ -6,6 +6,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>${document.title} - <fmt:message key="app.title"/></title>
     <%@ include file="fragments/common-styles.jsp" %>
 </head>
@@ -77,7 +80,7 @@
                 </div>
             </div>
 
-            <c:if test="${document.hasExtractedText}">
+            <c:if test="${document.isHasExtractedText}">
                 <div class="info-section" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05);">
                     <h3 class="section-title">
                         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
@@ -87,7 +90,7 @@
                 </div>
             </c:if>
 
-            <c:if test="${document.hasOcrError}">
+            <c:if test="${document.isHasOcrError}">
                 <div class="ocr-error" style="margin-top: 24px; padding: 20px; background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); border-radius: 12px; display: flex; align-items: flex-start; gap: 16px;">
                     <svg viewBox="0 0 24 24" width="32" height="32" style="fill:#fbbf24; flex-shrink:0;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
                     <div>
@@ -98,7 +101,7 @@
             </c:if>
 
             <div class="actions" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; gap: 12px; flex-wrap: wrap;">
-                <c:if test="${document.hasOcrError}">
+                <c:if test="${document.isHasOcrError}">
                     <form method="post" action="${pageContext.request.contextPath}/cabinet/documents/${document.id}/retry-ocr" style="display:inline;">
                         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                         <button type="submit" class="btn btn-warning">
@@ -137,7 +140,7 @@
             <div id="noPreview" style="display:none; flex-direction:column; align-items:center; justify-content:center; color:#6b7280; text-align:center; min-height:200px;">
                 <svg viewBox="0 0 24 24" width="64" height="64" style="fill:#6b7280;"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
                 <p style="margin-top:12px; font-size:14px;"><fmt:message key="viewer.no_preview"/></p>
-                <a id="viewerDownloadLink" href="#" class="btn btn-primary" style="margin-top:12px;">
+                <a id="viewerDownloadLink" href="#" class="btn btn-primary" style="margin-top:12px;" download>
                     <svg viewBox="0 0 24 24" width="18" height="18"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                     <fmt:message key="download"/>
                 </a>
@@ -172,8 +175,8 @@
         .btn-warning, .btn-danger { background: rgba(0,0,0,0.2); border: 1px solid; }
         .btn-warning { color: #fbbf24; border-color: rgba(251,191,36,0.3); }
         .btn-danger { color: #f87171; border-color: rgba(239,68,68,0.3); }
-        .btn-view { background: rgba(0,212,170,0.1); color: #00d4aa; border: 1px solid rgba(0,212,170,0.3); }
-        .btn-view:hover { background: rgba(0,212,170,0.2); }
+        .btn-view { background: rgba(0,212,170,0.1); color: #00d4aa; border: 1px solid rgba(0,212,170,0.3); cursor: pointer; }
+        .btn-view:hover { background: rgba(0,212,170,0.3); border-color: #00d4aa; }
         .info-section { margin-bottom: 20px; }
         .files-section { margin-top: 24px; }
         .files-section h3 { color: #fff; font-size: 16px; font-weight: 600; margin-bottom: 16px; }
@@ -203,24 +206,27 @@
     </style>
 
     <script>
-        <c:choose>
-            <c:when test="${not empty document.files}">
-        const files = [
+        // Force reload by adding timestamp
+        window.lastViewLoad = Date.now();
+        
+        var files = [
             <c:forEach var="file" items="${document.files}" varStatus="status">
-                { id: ${file.id}, name: "${file.fileName}", url: "${pageContext.request.contextPath}/cabinet/documents/${document.id}/download/${file.id}" }
-                <c:if test="${not status.last}">,</c:if>
+                { id: '${file.id}', name: '<c:out value="${file.fileName}" escapeXml="true"/>', url: '${pageContext.request.contextPath}/cabinet/documents/${document.id}/preview/${file.id}', downloadUrl: '${pageContext.request.contextPath}/cabinet/documents/${document.id}/download/${file.id}' }
+                ${status.last ? '' : ','}
             </c:forEach>
         ];
         
-        let currentIndex = 0;
-        let currentZoom = 1;
+        var currentIndex = 0;
+        var currentZoom = 1;
 
         function openViewer(index) {
-            currentIndex = index;
-            currentZoom = 1;
-            updateViewer();
-            document.getElementById('viewerModal').classList.add('active');
-            document.body.style.overflow = 'hidden';
+            if (typeof files !== 'undefined' && files.length > 0) {
+                currentIndex = index;
+                currentZoom = 1;
+                updateViewer();
+                document.getElementById('viewerModal').classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
         }
 
         function closeViewer() {
@@ -229,22 +235,31 @@
         }
 
         function updateViewer() {
-            const file = files[currentIndex];
-            const img = document.getElementById('viewerImage');
-            const noPreview = document.getElementById('noPreview');
+            if (typeof files === 'undefined' || files.length === 0) return;
+            var file = files[currentIndex];
+            var img = document.getElementById('viewerImage');
+            var noPreview = document.getElementById('noPreview');
+            var downloadLink = document.getElementById('viewerDownloadLink');
             
             img.style.display = 'block';
             noPreview.style.display = 'none';
             img.src = file.url;
+            img.style.transform = 'scale(' + currentZoom + ')';
             document.getElementById('viewerTitle').textContent = file.name;
             document.getElementById('viewerCounter').textContent = (currentIndex + 1) + ' / ' + files.length;
             document.getElementById('prevBtn').disabled = currentIndex === 0;
             document.getElementById('nextBtn').disabled = currentIndex === files.length - 1;
-            document.getElementById('viewerDownloadLink').href = file.url;
+            downloadLink.href = file.downloadUrl;
+            downloadLink.download = file.name;
         }
 
-        function prevImage() { if (currentIndex > 0) { currentIndex--; updateViewer(); } }
-        function nextImage() { if (currentIndex < files.length - 1) { currentIndex++; updateViewer(); } }
+        function prevImage() {
+            if (currentIndex > 0) { currentIndex--; currentZoom = 1; updateViewer(); }
+        }
+
+        function nextImage() {
+            if (currentIndex < files.length - 1) { currentIndex++; currentZoom = 1; updateViewer(); }
+        }
 
         function zoomIn() { currentZoom = Math.min(currentZoom + 0.25, 3); document.getElementById('viewerImage').style.transform = 'scale(' + currentZoom + ')'; }
         function zoomOut() { currentZoom = Math.max(currentZoom - 0.25, 0.25); document.getElementById('viewerImage').style.transform = 'scale(' + currentZoom + ')'; }
@@ -256,11 +271,6 @@
             if (e.key === 'ArrowLeft') prevImage();
             if (e.key === 'ArrowRight') nextImage();
         });
-            </c:when>
-            <c:otherwise>
-        const files = [];
-            </c:otherwise>
-        </c:choose>
     </script>
 </body>
 </html>

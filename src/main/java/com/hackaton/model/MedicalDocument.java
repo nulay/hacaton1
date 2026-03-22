@@ -104,6 +104,10 @@ public class MedicalDocument {
         this.extractedText = extractedText;
     }
 
+    public boolean isHasExtractedText() {
+        return extractedText != null && !extractedText.isEmpty();
+    }
+
     public boolean hasExtractedText() {
         return extractedText != null && !extractedText.isEmpty();
     }
@@ -126,6 +130,10 @@ public class MedicalDocument {
 
     public void setOcrError(String ocrError) {
         this.ocrError = ocrError;
+    }
+
+    public boolean isHasOcrError() {
+        return ocrError != null && !ocrError.isEmpty();
     }
 
     public boolean hasOcrError() {

@@ -6,6 +6,8 @@ import com.hackaton.model.User;
 import com.hackaton.service.MedicalDocumentService;
 import com.hackaton.service.UserService;
 import org.springframework.beans.factory.annotation.Value;
+import javax.servlet.http.HttpServletResponse;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -43,7 +45,7 @@ public class DocumentController {
     }
 
     @GetMapping("/cabinet/documents")
-    public String documents(Authentication authentication, Model model) {
+    public String documents(Authentication authentication, Model model, HttpServletResponse response) {
         String email = authentication.getName();
         User user = userService.findByEmail(email).orElse(null);
         if (user == null) {
@@ -55,6 +57,10 @@ public class DocumentController {
         }
         boolean isPremium = user.isPremiumActive();
         boolean limitReached = !isPremium && documents.size() >= freemiumLimit;
+        
+        response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("Expires", "0");
         
         model.addAttribute("email", email);
         model.addAttribute("lastName", user.getLastName());
@@ -115,7 +121,7 @@ public class DocumentController {
     }
 
     @GetMapping("/cabinet/documents/{id}/view")
-    public String viewDocument(@PathVariable Long id, Authentication authentication, Model model) {
+    public String viewDocument(@PathVariable Long id, Authentication authentication, Model model, HttpServletResponse response) {
         String email = authentication.getName();
         User user = userService.findByEmail(email).orElse(null);
         if (user == null) {
@@ -126,6 +132,10 @@ public class DocumentController {
         if (doc.isEmpty()) {
             return "redirect:/cabinet/documents";
         }
+        
+        response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("Expires", "0");
         
         model.addAttribute("document", doc.get());
         model.addAttribute("email", email);
@@ -169,6 +179,56 @@ public class DocumentController {
             .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getFileName() + "\"")
             .contentType(MediaType.APPLICATION_OCTET_STREAM)
             .body(fileContent);
+    }
+
+    @GetMapping("/cabinet/documents/{id}/preview/{fileId}")
+    public ResponseEntity<byte[]> previewFile(@PathVariable Long id, @PathVariable Long fileId, Authentication authentication) throws IOException {
+        String email = authentication.getName();
+        User user = userService.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Optional<MedicalDocument> docOpt = documentService.getDocumentByIdAndUserId(id, user.getId());
+        if (docOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        MedicalDocument doc = docOpt.get();
+        Optional<DocumentFile> fileOpt = doc.getFiles().stream()
+            .filter(f -> f.getId().equals(fileId))
+            .findFirst();
+        
+        if (fileOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        DocumentFile file = fileOpt.get();
+        Path filePath = Paths.get(documentService.getUploadDir() + file.getFilePath());
+        
+        if (!Files.exists(filePath)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        byte[] fileContent = Files.readAllBytes(filePath);
+        MediaType mediaType = getMediaTypeForFile(file.getFileName());
+
+        return ResponseEntity.ok()
+            .contentType(mediaType)
+            .cacheControl(org.springframework.http.CacheControl.noCache())
+            .body(fileContent);
+    }
+
+    private MediaType getMediaTypeForFile(String filename) {
+        if (filename == null) return MediaType.APPLICATION_OCTET_STREAM;
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return MediaType.IMAGE_JPEG;
+        if (lower.endsWith(".png")) return MediaType.IMAGE_PNG;
+        if (lower.endsWith(".gif")) return MediaType.IMAGE_GIF;
+        if (lower.endsWith(".webp")) return new MediaType("image", "webp");
+        if (lower.endsWith(".pdf")) return MediaType.APPLICATION_PDF;
+        if (lower.endsWith(".bmp")) return new MediaType("image", "bmp");
+        return MediaType.APPLICATION_OCTET_STREAM;
     }
 
     @GetMapping("/cabinet/documents/{id}/edit")
