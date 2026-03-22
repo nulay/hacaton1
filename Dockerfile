@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Copy dependency manifests first for layer caching
 COPY pom.xml .
+COPY flyway.properties .
 RUN mvn dependency:go-offline -q
 
 # Copy source and build
