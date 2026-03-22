@@ -1,0 +1,2 @@
+ALTER TABLE users ADD COLUMN photo_url VARCHAR(500);
+ALTER TABLE users ADD COLUMN birth_date DATE;
