@@ -11,12 +11,26 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./docker/db/init/01-create-database.sql:/docker-entrypoint-initdb.d/01-create-database.sql:ro
+      - ./docker/db/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d medical_archive"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  app:
+    build: .
+    container_name: medical-archive-app
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/medical_archive
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   pgdata:
